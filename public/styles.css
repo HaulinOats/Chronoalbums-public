@@ -1,0 +1,118 @@
+body {
+    margin-left:15px;
+    margin-top:15px;
+    font-family: 'Raleway', sans-serif;
+}
+#login, #loggedin {
+    
+}
+.error-msg {
+    color:red;
+}
+#token-error {
+    display: none;
+}
+#oauth, #obtain-new-token {
+    display: none;
+}
+.text-overflow {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 500px;
+}
+#album-bg {
+    background-image: url(albums-bg.jpg);
+    background-size: cover;
+    height:100%;
+    width:100%;
+    position:fixed;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    opacity:.3;
+}
+#page-content {
+    position:relative;
+}
+#sort-results-table {
+    margin-top:20px;
+    width:95%;
+    margin:0 auto;
+}
+#sort-results-table th{
+    font-weight: bold;
+    background:darkgray;
+    padding:5px 0 5px 5px;
+    font-size:20px;
+}
+#sort-results-table td{
+    padding:5px 0 5px 5px;
+}
+h1 {
+    margin-top:0;
+    font-family: 'Monoton', cursive;
+    display:inline-block;
+}
+#profile-status {
+    float:right;
+    margin-top:2%;
+}
+#oauth {
+    
+}
+#oauth-inner {
+    
+}
+#user-profile {
+    position: absolute;
+    top: 0;
+    right: 1%;
+}
+#user-profile img {
+    display: inline-block;
+    width: 50px;
+}
+#user-profile p {
+    display: inline-block;
+}
+#about {
+    margin-top:1%;
+    margin-bottom:2%;
+    width:80%;
+    font-size:18px;
+}
+#find-and-sort {
+    display: block;
+    margin-bottom: 15px;
+    border: none;
+    padding: 10px;
+    border-radius: 5px;
+    background: steelblue;
+    color: white;
+    box-shadow: 2px 2px 3px black;
+}
+#find-and-sort:active {
+    box-shadow: none;
+}
+#loading-cont {
+    display:none;
+}
+#loading-cont img {
+    display:block;
+    margin:0 auto;
+}
+#loading-cont p {
+    text-align: center;
+    font-size:20px;
+}
+#release-date-sort {
+    cursor:pointer;
+}
+#years-label {
+    font-size:18px;
+    margin-bottom:20px;
+}
+#years-input {
+
+}

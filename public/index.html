@@ -1,0 +1,288 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Example of the Authorization Code flow with Spotify</title>
+    <link href="https://fonts.googleapis.com/css?family=Monoton" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Raleway" rel="stylesheet">
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+
+  <body>
+    <div id="album-bg"></div>
+    <div id="page-content">
+        <h1>Chronoalbums</h1>
+        <div id="loggedin">
+            <div id="user-profile"></div>
+            <div id="oauth"></div>
+            <button class="btn btn-default" id="obtain-new-token">Obtain new token using the refresh token</button>
+        </div>
+        <div id="about">
+        <p>Have you ever been browsing music on your favorite music app and hear an awesome new song from an artist you love only to realize the album it was on came out over 6 months ago?
+            It's nearly impossible to keep up with all my favorite artists so that's why I created <b>Chronoalbums</b>; a simple application that will gather all the artists in your Spotify library then sort all their albums in chronological order.</p>
+        <p>Click "Find and Sort Albums" and give the application up to a minute to finish working.  The larger your library, the more time is required. (API rate limiting is the reason)</p>
+        </div>
+        <!--<label id="years-label">How many years back do you want to check for albums?</label>
+        <input type="number" id="years-input" min="1" max="99" value="2"/>-->
+        <button id="find-and-sort">Find and Sort Albums</button>
+        <p id="token-error" class="error-msg">You must refresh your token.  Click "Log in with Spotify" button.</p>
+        <div id="login">
+            <a href="/login" class="btn btn-primary">Log in with Spotify</a>
+        </div>
+        <div id="loading-cont">
+            <img src="magnify.gif" alt="loading gif"/>
+            <p id="loading-text">Scanning all artists...</p>
+        </div>
+        <div id="album-sort-results"></div>
+
+        <script id="user-profile-template" type="text/x-handlebars-template">
+            <div>
+                <img class="media-object" width="150" src="{{images.0.url}}" />
+                <p>Logged in as {{display_name}}</p>
+            </div>
+        </script>
+    </div>
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0-alpha.1/handlebars.min.js"></script>
+    <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+    <script>
+      (function() {
+        var loadingContainer = document.getElementById('loading-cont'),
+            loadingText = document.getElementById('loading-text'),
+            findAndSort = document.getElementById('find-and-sort'),
+            loginButton = document.getElementById('login'),
+            loggedIn = document.getElementById('loggedin'),
+            tokenError = document.getElementById('token-error'),
+            userProfileSource = document.getElementById('user-profile-template').innerHTML,
+            userProfileTemplate = Handlebars.compile(userProfileSource),
+            userProfilePlaceholder = document.getElementById('user-profile'),
+            dateSort,
+            params = getHashParams(),
+            access_token = params.access_token,
+            refresh_token = params.refresh_token,
+            error = params.error,
+            sortedData,
+            isProcessing = false;
+            // yearsInput = document.getElementById('years-input'),
+            // currentDate = new Date(),
+            // currentYear = currentDate.getFullYear();
+        /**
+         * Obtains parameters from the hash of the URL
+         * @return Object
+         */
+        function getHashParams() {
+          var hashParams = {};
+          var e, r = /([^&;=]+)=?([^&;]*)/g,
+              q = window.location.hash.substring(1);
+          while ( e = r.exec(q)) {
+             hashParams[e[1]] = decodeURIComponent(e[2]);
+          }
+          return hashParams;
+        }
+
+        //Authenticate User
+        if (error) {
+          alert('There was an error during the authentication');
+        } else {
+          //If access_token received/valid, connect to user's Spotify account
+          if (access_token) {
+            $.ajax({
+                url: 'https://api.spotify.com/v1/me',
+                headers: {
+                  'Authorization': 'Bearer ' + access_token
+                },
+                success: function(response) {
+                  userProfilePlaceholder.innerHTML = userProfileTemplate(response);
+                  loginButton.style.display = "none";
+                  loggedIn.style.display = "block";
+                },
+                error: function(reponse){
+                    findAndSort.style.display = "none";
+                    tokenError.style.display = "block";
+                }
+            });
+          } else {
+              // render initial screen
+              loginButton.style.display = "block";
+              loggedIn.style.display = "none";
+          }
+
+          //obtain new token
+          loginButton.addEventListener('click', function() {
+            $.ajax({
+              url: '/refresh_token',
+              data: {
+                'refresh_token': refresh_token
+              }
+            }).done(function(data) {
+              access_token = data.access_token;
+              oauthPlaceholder.innerHTML = oauthTemplate({
+                access_token: access_token,
+                refresh_token: refresh_token
+              });
+            });
+          }, false);
+
+          //get artist ids
+          var artistIds = [],
+              artistTimeout;
+          findAndSort.addEventListener('click', function(){
+              findAndSort.style.display = "none";
+              $.ajax({
+              url: 'https://api.spotify.com/v1/me/tracks',
+              headers: {
+                  'Authorization': 'Bearer ' + access_token
+              },
+              data: {
+                'refresh_token': refresh_token
+              }
+            }).done(function(data) {
+                loadingContainer.style.display = "block";
+                for (var i = 0; i < data.items.length; i++) artistIds.push(data.items[i].track.artists[0].id);
+                callMoreData(data.next);
+            });
+          }, false);
+
+          //call to more artist data
+          function callMoreData(dataUrl){
+              $.ajax({
+              url: dataUrl,
+              headers: {
+                  'Authorization': 'Bearer ' + access_token
+              },
+              data: {
+                'refresh_token': refresh_token
+              }
+            }).done(function(data) {
+                for (var i = 0; i < data.items.length; i++) artistIds.push(data.items[i].track.artists[0].id);
+                if (data.next) callMoreData(data.next)
+                else {
+                    artistIds = uniq_fast(artistIds);
+                    getAlbums();
+                }
+            });
+          }
+
+          var albumIds = [];
+          function getAlbums(){
+            var loopTimeout = 0,
+                count = 0;
+              loadingText.innerHTML = "Fetching all artist albums...";
+              for (var i = 0; i < artistIds.length; i++){
+                setTimeout(function(){
+                    $.ajax({
+                    url: 'https://api.spotify.com/v1/artists/' + artistIds[count] + '/albums/?album_type=album&market=US',
+                    headers: {
+                        'Authorization': 'Bearer ' + access_token
+                    },
+                    data: {
+                        'refresh_token': refresh_token
+                    }
+                    }).done(function(data, textStatus, request) {
+                        for (var j = 0; j < data.items.length; j++) albumIds.push(data.items[j].id);
+                        if (count === artistIds.length){
+                            albumIds = uniq_fast(albumIds);
+                            getSortAlbums();
+                        }
+                    });
+                    count++;
+                }, loopTimeout);
+                loopTimeout += 150;
+              }
+          }
+
+          function getSortAlbums(){
+            var albumGroups = [],
+                  singleGroup = [],
+                  count = 0,
+                  groupIdx = 0;
+              for (var i = 0; i < albumIds.length; i++){
+                  if (count === 20){
+                    albumGroups.push(singleGroup);
+                    singleGroup = [];
+                    count = 0;
+                    groupIdx++;
+                  } else {
+                      singleGroup.push(albumIds[i]);
+                      count++;
+                  }
+              }
+
+              //consolidate urls
+              var urlArr = [];
+              for (var i = 0; i < albumGroups.length; i++) urlArr.push(albumGroups[i].join(","));
+
+              var baseURL = "https://api.spotify.com/v1/albums?ids=",
+                  loopTimeout = 0,
+                  finalAlbumObjArr = [],
+                  loopCount = 0;
+              loadingText.innerHTML = "Sorting albums...";
+              for (var i = 0; i < urlArr.length; i++){
+                  setTimeout(function(){
+                      $.ajax({
+                        url: baseURL + urlArr[loopCount] + "&market=US",
+                        headers: {
+                            'Authorization': 'Bearer ' + access_token
+                        },
+                        data: {
+                            'refresh_token': refresh_token
+                        }
+                      }).done(function(data) {
+                          for (var j = 0; j < data.albums.length; j++) finalAlbumObjArr.push(data.albums[j]);
+                          if (loopCount === urlArr.length){
+                            sortedData = finalAlbumObjArr.sort(compare);
+                            buildAlbumTable();
+                            loadingContainer.style.display = "none";
+                          }
+                      });
+                      loopCount++;
+                  }, loopTimeout);
+                  loopTimeout += 170;
+              }
+          }
+
+          function buildAlbumTable(){
+            isProcessing = true;
+            sortedData.reverse();
+            var html = "<table id='sort-results-table'><tr><th>Artist Name</th><th>Album Name</th><th id='release-date-sort'>Release Date</th></tr>";
+            for (var k = 0; k < sortedData.length; k++){
+                // if (sortedData[k].release_date >= String(currentYear - yearsInput.value)){}
+                    html += "<tr style='background:"+ (isOdd(k) ? 'lightgray' :'white' )+"'><td><a href='"+ sortedData[k].artists[0].uri +"' target='_blank'>"+ sortedData[k].artists[0].name +"</a></td><td><a href='"+ sortedData[k].external_urls.spotify +"' target='_blank'>"+ sortedData[k].name +"</a></td><td>"+ sortedData[k].release_date +"</td></tr>"
+            }
+            html += "</table>";
+            document.getElementById('album-sort-results').innerHTML = html;
+            isProcessing = false;
+            document.getElementById('release-date-sort').addEventListener('click', function(){
+                if (!isProcessing) buildAlbumTable();
+            });
+          }
+
+          function uniq_fast(a) {
+                var seen = {};
+                var out = [];
+                var len = a.length;
+                var j = 0;
+                for(var i = 0; i < len; i++) {
+                    var item = a[i];
+                    if(seen[item] !== 1) {
+                        seen[item] = 1;
+                        out[j++] = item;
+                    }
+                }
+                return out;
+          }
+
+          function compare(a,b){
+              if (a.release_date < b.release_date) return -1;
+              if (a.release_date > b.release_date) return 1;
+              return 0;
+          }
+
+          function isOdd(num){
+            return num % 2;
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>
