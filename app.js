@@ -3,9 +3,12 @@ var request = require('request'); // "Request" library
 var querystring = require('querystring');
 var cookieParser = require('cookie-parser');
 
+var server_port = process.env.OPENSHIFT_NODEJS_PORT || 8080
+var server_ip_address = process.env.OPENSHIFT_NODEJS_IP || 'localhost'
+
 var client_id = 'c328ff94e771496682b76ca33ce49c26'; // Your client id
 var client_secret = '6516cf7530b3409c85c463c19db767f4'; // Your secret
-var redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri
+var redirect_uri = 'http://'+ server_ip_address +':'+ server_port +'/callback'; // Your redirect uri
 
 /**
  * Generates a random string containing numbers and letters
@@ -132,6 +135,7 @@ app.get('/refresh_token', function(req, res) {
     }
   });
 });
-
-console.log('Listening on 8080');
-app.listen(8080);
+ 
+app.listen(server_port, server_ip_address, function () {
+  console.log( "Listening on " + server_ip_address + ", port " + server_port )
+});
